@@ -7,13 +7,19 @@
 
     <!-- A-Frame本体 -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <!-- 便利系（任意。アニメーション等で使用可）-->
+    <!-- A-Frame Extras（アニメーション等）-->
     <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
     <!-- MindAR (Image Tracking / A-Frame版) -->
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: transparent; /* 透過に変更 */
+      }
       .overlay {
         position: fixed; inset: 0; display: grid; place-items: center;
         background: #000; color: #fff; z-index: 10;
@@ -32,51 +38,46 @@
   </head>
 
   <body>
-    <!-- iOS/SafariのAutoplay制限・カメラ許可をユーザー操作で開始するためのオーバーレイ -->
+    <!-- iOSのオーディオ制限対応 -->
     <div id="gate" class="overlay">
       <div style="text-align:center">
         <h2 style="margin:0 0 10px">ARを開始する</h2>
-        <p style="opacity:.8;margin:0 0 18px">カメラ許可のダイアログが出たら「許可」を選んでください。</p>
+        <p style="opacity:.8;margin:0 0 18px">カメラの許可を「許可」にしてください。</p>
         <button id="startBtn" class="btn">Start AR</button>
       </div>
     </div>
 
-    <!-- 画面左下の簡易ヒント -->
+    <!-- 画面左下のヒント -->
     <div class="hint">
-      ターゲット画像（<code>target.jpg</code> / <code>targets.mind</code>に含まれる画像）をカメラに映すと、<br/>
-      モデルと音声が再生されます。
+      <code>targets.mind</code> の画像を映すとモデルと音声が再生されます。
     </div>
 
     <!-- A-Frame / MindAR シーン -->
     <a-scene
       mindar-image="imageTargetSrc: ./targets.mind;"
       color-space="sRGB"
-      renderer="colorManagement: true, physicallyCorrectLights: true, antialias: true"
+      renderer="colorManagement: true, physicallyCorrectLights: true, antialias: true, alpha: true"
+      background="color: transparent"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
       embedded
     >
-      <!-- 事前ロードするアセット。全て同じディレクトリに置く前提 -->
+      <!-- アセット -->
       <a-assets timeout="60000">
-        <!-- GLBモデル（ユーザー同梱ファイル） -->
         <a-asset-item id="mascotA" src="./mascot.glb"></a-asset-item>
         <a-asset-item id="mascotB" src="./mascot1.glb"></a-asset-item>
-
-        <!-- 音声（ユーザー同梱ファイル） -->
         <audio id="voice" src="./voice.mp3" preload="auto" crossorigin="anonymous"></audio>
       </a-assets>
 
-      <!-- ライティング（物理ベース前提で最低限） -->
+      <!-- 照明 -->
       <a-entity light="type: ambient; intensity: 0.6"></a-entity>
       <a-entity light="type: directional; intensity: 0.9" position="0 1 1"></a-entity>
 
-      <!-- カメラ（MindAR推奨の固定カメラ） -->
+      <!-- カメラ -->
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- ターゲット0に反応するエンティティ -->
-      <!-- targets.mind に登録した 1つ目の画像（index 0）で表示 -->
+      <!-- ターゲット0 -->
       <a-entity id="target0" mindar-image-target="targetIndex: 0">
-        <!-- モデルA。大きさは適宜調整（GLBの実寸に依る） -->
         <a-gltf-model
           id="modelA"
           src="#mascotA"
@@ -85,17 +86,14 @@
           scale="0.12 0.12 0.12"
           animation-mixer
         ></a-gltf-model>
-
-        <!-- 音声プレイヤー：ターゲット検出時に再生 -->
         <a-entity id="soundA"
-          sound="src: #voice; autoplay: false; positional: true; loop: false; distanceModel: linear; maxDistance: 5"
+          sound="src: #voice; autoplay: false; positional: true; loop: false"
           position="0 0 0.1"
         ></a-entity>
       </a-entity>
 
-      <!-- ターゲット1に反応するエンティティ -->
+      <!-- ターゲット1 -->
       <a-entity id="target1" mindar-image-target="targetIndex: 1">
-        <!-- モデルB -->
         <a-gltf-model
           id="modelB"
           src="#mascotB"
@@ -104,22 +102,18 @@
           scale="0.12 0.12 0.12"
           animation-mixer
         ></a-gltf-model>
-
-        <!-- 同じ音声を使い回してもOK。別音声を使うなら別<audio>をa-assetsに追加 -->
         <a-entity id="soundB"
-          sound="src: #voice; autoplay: false; positional: true; loop: false; distanceModel: linear; maxDistance: 5"
+          sound="src: #voice; autoplay: false; positional: true; loop: false"
           position="0 0 0.1"
         ></a-entity>
       </a-entity>
     </a-scene>
 
     <script>
-      // ====== 再生制御とiOSオーディオ解放 ======
       const gate = document.getElementById('gate');
       const startBtn = document.getElementById('startBtn');
 
       function resumeAudioContextIfNeeded() {
-        // A-FrameのオーディオはWebAudio。iOS等はユーザー操作でresumeが必要。
         const ctx = (AFRAME && AFRAME.audioContext) ? AFRAME.audioContext : null;
         if (ctx && ctx.state === 'suspended') {
           return ctx.resume();
@@ -129,54 +123,30 @@
 
       async function startAR() {
         await resumeAudioContextIfNeeded();
-        gate.classList.add('hidden'); // オーバーレイを消す
+        gate.classList.add('hidden');
       }
-
       startBtn.addEventListener('click', startAR);
 
-      // ====== ターゲット検出時のイベントでサウンド再生 ======
-      const target0 = document.getElementById('target0');
-      const target1 = document.getElementById('target1');
-
       const playOnce = (soundEl) => {
-        // soundコンポーネントの再生API
         if (soundEl && soundEl.components && soundEl.components.sound) {
           const s = soundEl.components.sound;
-          // 毎回頭から再生したい場合はstop→play
           s.stopSound();
           s.playSound();
         }
       };
-
       const stopIfPlaying = (soundEl) => {
         if (soundEl && soundEl.components && soundEl.components.sound) {
           soundEl.components.sound.stopSound();
         }
       };
 
-      // targetFound/targetLost は mindar-image-target が発火
-      target0.addEventListener('targetFound', () => {
-        const soundA = document.getElementById('soundA');
-        playOnce(soundA);
-      });
-      target0.addEventListener('targetLost', () => {
-        const soundA = document.getElementById('soundA');
-        stopIfPlaying(soundA);
-      });
+      const target0 = document.getElementById('target0');
+      const target1 = document.getElementById('target1');
 
-      target1.addEventListener('targetFound', () => {
-        const soundB = document.getElementById('soundB');
-        playOnce(soundB);
-      });
-      target1.addEventListener('targetLost', () => {
-        const soundB = document.getElementById('soundB');
-        stopIfPlaying(soundB);
-      });
-
-      // ====== 参考: デバッグログ（必要なら有効化）
-      // document.querySelector('a-scene').addEventListener('loaded', () => {
-      //   console.log('Scene loaded. MindAR will initialize when camera feed is ready.');
-      // });
+      target0.addEventListener('targetFound', () => playOnce(document.getElementById('soundA')));
+      target0.addEventListener('targetLost', () => stopIfPlaying(document.getElementById('soundA')));
+      target1.addEventListener('targetFound', () => playOnce(document.getElementById('soundB')));
+      target1.addEventListener('targetLost', () => stopIfPlaying(document.getElementById('soundB')));
     </script>
   </body>
 </html>
