@@ -1,275 +1,194 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>WebAR: 画像から3Dキャラ&キーワード</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>WebAR: 画像から3Dキャラ&キーワード（安定版）</title>
 
-    <!-- A-Frame & MindAR -->
-    <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
-    <script src="https://unpkg.com/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+  <!-- A-Frame → MindAR の順で読み込み -->
+  <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
+  <script src="https://unpkg.com/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
 
-    <style>
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            background: #000;
-        }
-
-        /* 画面上部の薄い説明帯 */
-        .hint {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0, 0, 0, .55);
-            color: #fff;
-            font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-            padding: 8px 12px;
-            text-align: center;
-            z-index: 10;
-            backdrop-filter: blur(4px);
-        }
-
-        /* キーワードの表示UI（最初は非表示） */
-        .keyword-card {
-            position: fixed;
-            left: 50%;
-            bottom: 24px;
-            transform: translateX(-50%);
-            width: min(92vw, 480px);
-            background: rgba(255, 255, 255, .95);
-            color: #111;
-            border-radius: 14px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
-            padding: 14px;
-            z-index: 10;
-            display: none;
-            font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-        }
-
-        .keyword-title {
-            font-weight: 700;
-            margin-bottom: 6px;
-        }
-
-        .keyword-value {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-            font-size: 18px;
-            background: #f4f4f6;
-            border-radius: 8px;
-            padding: 8px 10px;
-            overflow-wrap: anywhere;
-            border: 1px solid rgba(0, 0, 0, .06);
-        }
-
-        .row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 10px;
-        }
-
-        .btn {
-            appearance: none;
-            border: none;
-            cursor: pointer;
-            border-radius: 10px;
-            padding: 10px 14px;
-            font-weight: 700;
-            background: #111;
-            color: #fff;
-            box-shadow: 0 4px 12px rgba(17, 17, 17, .25);
-        }
-
-        .btn:active {
-            transform: translateY(1px);
-        }
-
-        .toast {
-            position: fixed;
-            left: 50%;
-            bottom: 100px;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, .85);
-            color: #fff;
-            border-radius: 999px;
-            padding: 8px 14px;
-            font-size: 14px;
-            display: none;
-            z-index: 10;
-        }
-
-        /* カメラ許可ガイド（iOS対策の軽い前面ガイド） */
-        .permission {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #000;
-            color: #fff;
-            z-index: 9999;
-        }
-
-        .permission.hidden {
-            display: none;
-        }
-
-        .perm-box {
-            text-align: center;
-            padding: 24px;
-        }
-
-        .perm-box h1 {
-            font-size: 20px;
-            margin: 0 0 10px;
-        }
-
-        .perm-box p {
-            opacity: .85;
-        }
-
-        .perm-btn {
-            margin-top: 14px;
-        }
-    </style>
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:#000; }
+    .bar {
+      position: fixed; top:0; left:0; right:0; z-index: 20;
+      background: rgba(0,0,0,.55); color:#fff; padding:8px 12px; text-align:center;
+      font: 14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica Neue,Arial;
+      backdrop-filter: blur(4px);
+    }
+    .permission { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:#000; color:#fff; z-index:9999; }
+    .permission.hidden{ display:none; }
+    .box { text-align:center; padding:24px; }
+    .btn {
+      appearance:none; border:none; cursor:pointer; border-radius:12px;
+      padding:12px 16px; font-weight:700; background:#13a10e; color:#fff; margin-top:12px;
+      box-shadow:0 6px 16px rgba(0,0,0,.35);
+    }
+    .btn:active{ transform: translateY(1px); }
+    .warn { color:#ffd166; font-size:13px; margin-top:8px; }
+    .card {
+      position: fixed; left:50%; bottom:24px; transform: translateX(-50%);
+      width:min(92vw,480px); background:rgba(255,255,255,.95); color:#111; border-radius:14px;
+      box-shadow:0 8px 20px rgba(0,0,0,.35); padding:14px; z-index: 20; display:none;
+      font: 16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica Neue,Arial;
+    }
+    .title{ font-weight:700; margin-bottom:6px; }
+    .mono{
+      font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+      font-size:18px; background:#f4f4f6; border-radius:8px; padding:8px 10px; overflow-wrap:anywhere; border:1px solid rgba(0,0,0,.06);
+    }
+    .row{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:10px; }
+    .toast{ position:fixed; left:50%; bottom:100px; transform:translateX(-50%); background:rgba(0,0,0,.85); color:#fff; border-radius:999px; padding:8px 14px; font-size:14px; display:none; z-index:20; }
+  </style>
 </head>
-
 <body>
-    <!-- カメラ許可の前置き（ユーザーにワンタップさせると権限が通りやすい） -->
-    <div id="perm" class="permission">
-        <div class="perm-box">
-            <h1>カメラアクセスの許可</h1>
-            <p>「開始」を押すとカメラが起動します。ポスターにかざしてください。</p>
-            <button id="permStart" class="btn perm-btn">開始</button>
-        </div>
+  <!-- in-app browser 警告（LINE/Twitter/Instagramなど） -->
+  <div class="bar" id="info">ポスターにかざしてください…</div>
+
+  <!-- 許可ガイド→ボタン起点で権限を先取り（iOS重要） -->
+  <div id="perm" class="permission">
+    <div class="box">
+      <h1 style="font-size:20px;margin:0 0 10px;">カメラアクセスの許可</h1>
+      <p>「開始」を押すとカメラが起動します。ポスターにかざしてください。</p>
+      <button id="startBtn" class="btn">開始</button>
+      <div class="warn" id="iabWarn" style="display:none;">アプリ内ブラウザの可能性があります。右上メニューから「Safari/Chromeで開く」を選んでください。</div>
     </div>
+  </div>
 
-    <div class="hint" id="hint">ポスター（ターゲット画像）にゆっくり近づけてください…</div>
-
-    <!-- 合言葉カード -->
-    <div class="keyword-card" id="card">
-        <div class="keyword-title">合言葉</div>
-        <div class="keyword-value" id="kw"></div>
-        <div class="row">
-            <small id="status">認識中にキャラをタップすると表示されます</small>
-            <button class="btn" id="copyBtn">コピー</button>
-        </div>
+  <!-- 合言葉カード -->
+  <div class="card" id="card">
+    <div class="title">合言葉</div>
+    <div class="mono" id="kw"></div>
+    <div class="row">
+      <small id="status">キャラをタップすると表示されます</small>
+      <button class="btn" id="copyBtn" style="background:#111;">コピー</button>
     </div>
-    <div class="toast" id="toast">コピーしました</div>
+  </div>
+  <div class="toast" id="toast">コピーしました</div>
 
-    <!-- 効果音（任意） -->
-    <audio id="se" preload="auto" src="assets/voice.mp3"></audio>
+  <!-- A-Frame + MindAR シーン -->
+  <a-scene
+    id="scene"
+    embedded
+    color-space="sRGB"
+    renderer="colorManagement: true, physicallyCorrectLights: true, antialias: true, alpha: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+    mindar-image="imageTargetSrc: assets/target.mind; maxTrack: 1; warmupTolerance: 5; "
+  >
+    <a-assets timeout="15000">
+      <a-asset-item id="model" src="assets/mascot.glb" response-type="arraybuffer"></a-asset-item>
+    </a-assets>
 
-    <!-- A-Frame + MindAR シーン -->
-    <a-scene id="scene" embedded color-space="sRGB"
-        renderer="colorManagement: true, physicallyCorrectLights: true, antialias: true, alpha: true"
-        vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false"
-        mindar-image="imageTargetSrc: assets/target.mind; filterMinCF:0.0001; filterBeta: 10000;">
-        <a-assets timeout="15000">
-            <a-asset-item id="model" src="assets/mascot.glb"></a-asset-item>
-        </a-assets>
+    <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
 
-        <!-- カメラ -->
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-entity id="anchor" mindar-image-target="targetIndex: 0">
+      <a-entity id="char"
+                gltf-model="#model"
+                position="0 0 0"
+                scale="0.6 0.6 0.6"
+                animation-mixer="clip:*; loop:repeat;"
+                shadow="cast:true; receive:false"></a-entity>
+      <a-entity light="type: ambient; intensity: 1.0"></a-entity>
+      <a-entity light="type: directional; intensity: 1.2" position="0 1 1"></a-entity>
+    </a-entity>
+  </a-scene>
 
-        <!-- ターゲット0（target.mindに1枚だけ登録している想定） -->
-        <a-entity id="anchor" mindar-image-target="targetIndex: 0">
-            <!-- 少し上に持ち上げて重なり防止 -->
-            <a-entity id="char" gltf-model="#model" position="0 0 0" scale="0.6 0.6 0.6"
-                animation-mixer="clip: *; loop: repeat;" shadow="cast: true; receive: false" class="clickable">
-            </a-entity>
+  <script>
+    // ==== 設定 ====
+    const SECRET_KEYWORD = "KAICHI-2025"; // ←合言葉
+    const env = {
+      isIPhone: /iPhone|iPad|iPod/i.test(navigator.userAgent),
+      isIAB: /(Line|Instagram|FBAN|FBAV|Twitter|WeChat|MicroMessenger)/i.test(navigator.userAgent) // アプリ内ブラウザ
+    };
 
-            <!-- 環境光・方向光 -->
-            <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-            <a-entity light="type: directional; intensity: 1.2" position="0 1 1"></a-entity>
-        </a-entity>
-    </a-scene>
+    // 要素取得
+    const perm = document.getElementById('perm');
+    const iabWarn = document.getElementById('iabWarn');
+    const startBtn = document.getElementById('startBtn');
+    const info = document.getElementById('info');
 
-    <script>
-        // ========================
-        // 設定（ここを書き換え）
-        // ========================
-        const SECRET_KEYWORD = "KAICHI-2025"; // ← 合言葉
-        const MODEL_SCALE = 0.6;              // ← 3Dモデルの縮尺
-        // ========================
+    const sceneEl = document.getElementById('scene');
+    const anchor = document.getElementById('anchor');
+    const card = document.getElementById('card');
+    const kw = document.getElementById('kw');
+    const statusEl = document.getElementById('status');
+    const copyBtn = document.getElementById('copyBtn');
+    const toast = document.getElementById('toast');
 
-        const perm = document.getElementById('perm');
-        const permStart = document.getElementById('permStart');
-        const hint = document.getElementById('hint');
-        const card = document.getElementById('card');
-        const kw = document.getElementById('kw');
-        const statusEl = document.getElementById('status');
-        const copyBtn = document.getElementById('copyBtn');
-        const toast = document.getElementById('toast');
-        const se = document.getElementById('se');
+    if (env.isIAB) iabWarn.style.display = 'block';
 
-        const sceneEl = document.getElementById('scene');
-        const anchor = document.getElementById('anchor');
-        const charEl = document.getElementById('char');
+    // --- 重要：iOSは先に getUserMedia で権限を確保し、その後 MindAR.start() ---
+    async function preflightCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("getUserMedia not supported");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } }, audio: false
+      });
+      // 権限が取れたことだけ確認して、すぐに止める（MindARが自前で起動する）
+      for (const track of stream.getTracks()) track.stop();
+    }
 
-        // iOS対策：ユーザー操作で開始 → カメラ権限ダイアログ
-        permStart.addEventListener('click', async () => {
-            perm.classList.add('hidden');
-            try {
-                // MindAR起動（A-Frameの場合はシーンの初期化を待つだけでOK）
-                await sceneEl.components['mindar-image'].start();
-            } catch (e) {
-                console.warn(e);
-            }
-        });
+    async function startAR() {
+      // MindAR の start は A-Frame の初期化後に呼ぶ
+      const comp = sceneEl.components['mindar-image'];
+      if (!comp) {
+        // 初期化が未完なら少し待つ
+        await new Promise(r => setTimeout(r, 100));
+      }
+      await sceneEl.components['mindar-image'].start();
+    }
 
-        // ターゲット検出イベント
-        anchor.addEventListener('targetFound', () => {
-            hint.textContent = "ターゲット認識！キャラクターをタップして合言葉を表示";
-            // 軽い効果音
-            try { se.currentTime = 0; se.play().catch(() => { }); } catch (_) { }
-        });
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      try {
+        await preflightCamera(); // ← ここで権限ダイアログが出る（iOS）
+        perm.classList.add('hidden');
+        await startAR();
+        info.textContent = "ポスターにゆっくり近づけてください…";
+      } catch (e) {
+        console.error(e);
+        info.textContent = "カメラを利用できません。ブラウザの設定でカメラ許可をONにしてください。";
+        startBtn.disabled = false;
+      }
+    });
 
-        anchor.addEventListener('targetLost', () => {
-            hint.textContent = "ポスター（ターゲット画像）にゆっくり近づけてください…";
-        });
+    // ターゲット検出イベント
+    anchor.addEventListener('targetFound', () => {
+      info.textContent = "認識しました！キャラクターをタップして合言葉を表示";
+    });
+    anchor.addEventListener('targetLost', () => {
+      info.textContent = "ポスターにゆっくり近づけてください…";
+    });
 
-        // タップでキーワード表示（3Dモデルに対するクリック）
-        // A-Frameのカーソル代替（モバイルのタップ）:
-        window.addEventListener('click', (ev) => {
-            // 画面タップ位置からA-Frameのレイキャストを使うより、
-            // 簡易に「検出中ならOK」という仕様に（授業現場で安定重視）
-            const trackerVisible = anchor.object3D.visible;
-            if (!trackerVisible) return;
+    // 合言葉表示（簡易仕様：検出中に画面タップ）
+    window.addEventListener('click', () => {
+      if (!anchor.object3D.visible) return;
+      kw.textContent = SECRET_KEYWORD;
+      statusEl.textContent = "受付でこの合言葉を伝えてください。";
+      card.style.display = 'block';
+    });
 
-            // 表示
-            kw.textContent = SECRET_KEYWORD;
-            statusEl.textContent = "この合言葉を受付で伝えてください。";
-            card.style.display = 'block';
-        });
+    // クリップボードコピー
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(SECRET_KEYWORD);
+        toast.textContent = "コピーしました";
+      } catch {
+        toast.textContent = "コピーできない場合、手入力してください";
+      }
+      toast.style.display = 'block';
+      setTimeout(()=> toast.style.display='none', 1300);
+    });
 
-        // コピー
-        copyBtn.addEventListener('click', async () => {
-            try {
-                await navigator.clipboard.writeText(SECRET_KEYWORD);
-                toast.textContent = "コピーしました";
-            } catch (_) {
-                // 非対応端末フォールバック
-                toast.textContent = "コピーできない場合、手で入力してください";
-            }
-            toast.style.display = 'block';
-            setTimeout(() => toast.style.display = 'none', 1300);
-        });
-
-        // 端末個体差でモデルが大きすぎ/小さすぎる場合の微調整API
-        function setModelScale(s) {
-            charEl.setAttribute('scale', `${s} ${s} ${s}`);
-        }
-        setModelScale(MODEL_SCALE);
-
-        // 低帯域向け：初回は軽く、再検出で詳細読み込み…等の拡張も可能
-    </script>
+    // タブ復帰時（iOSでカメラが止まることがあるため再開）
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible' && !perm.classList.contains('hidden')) return;
+      try {
+        const comp = sceneEl.components['mindar-image'];
+        if (comp && !comp.video) { await startAR(); }
+      } catch {}
+    });
+  </script>
 </body>
-
 </html>
