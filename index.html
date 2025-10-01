@@ -54,7 +54,7 @@
 
     <!-- A-Frame / MindAR シーン -->
     <a-scene
-      mindar-image="imageTargetSrc: ./targets.mind;"
+      mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;"
       color-space="sRGB"
       renderer="colorManagement: true, physicallyCorrectLights: true, antialias: true, alpha: true"
       background="color: transparent"
@@ -112,6 +112,16 @@
     <script>
       const gate = document.getElementById('gate');
       const startBtn = document.getElementById('startBtn');
+      const sceneEl = document.querySelector('a-scene');
+
+      let arSystem = null;
+      let hasStartedAR = false;
+
+      if (sceneEl) {
+        sceneEl.addEventListener('loaded', () => {
+          arSystem = sceneEl.systems['mindar-image-system'];
+        });
+      }
 
       function resumeAudioContextIfNeeded() {
         const ctx = (AFRAME && AFRAME.audioContext) ? AFRAME.audioContext : null;
@@ -122,7 +132,30 @@
       }
 
       async function startAR() {
+        startBtn.disabled = true;
         await resumeAudioContextIfNeeded();
+
+        if (!arSystem && sceneEl && sceneEl.systems) {
+          arSystem = sceneEl.systems['mindar-image-system'];
+        }
+
+        if (!arSystem) {
+          console.error('MindAR system is not ready yet.');
+          startBtn.disabled = false;
+          return;
+        }
+
+        if (!hasStartedAR) {
+          try {
+            await arSystem.start();
+            hasStartedAR = true;
+          } catch (err) {
+            console.error('Failed to start AR session.', err);
+            startBtn.disabled = false;
+            return;
+          }
+        }
+
         gate.classList.add('hidden');
       }
       startBtn.addEventListener('click', startAR);
